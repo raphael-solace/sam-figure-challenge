@@ -1,0 +1,23 @@
+{
+  "name": "browser-challenge-solver",
+  "version": "1.0.0",
+  "description": "Fast brute-force agent to solve 30 browser navigation challenges",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent-bruteforce.js",
+    "bruteforce": "node agent-bruteforce.js",
+    "heuristic": "node agent.js",
+    "llm": "node agent-llm.js",
+    "hybrid": "node agent-hybrid.js",
+    "robust": "node agent-robust.js",
+    "final": "node agent-final.js",
+    "compare": "node compare.js"
+  },
+  "keywords": ["automation", "puppeteer", "challenge"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "dotenv": "^16.4.5"
+  }
+}
