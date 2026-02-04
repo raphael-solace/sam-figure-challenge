@@ -1,0 +1,14 @@
+{
+  "LLM_SERVICE_ENDPOINT": "https://api.groq.com/openai/v1",
+  "LLM_SERVICE_GENERAL_MODEL_NAME": "groq/llama-3.1-8b-instant",
+  "LLM_MAX_CALLS": "30",
+  "LLM_MAX_CALLS_PER_STEP": "1",
+  "LLM_MIN_CALLS_PER_RUN": "1",
+  "LLM_MIN_CALLS_PER_STEP": "1",
+  "LLM_ALWAYS_ON": "true",
+  "LLM_USE_CACHE": "false",
+  "LLM_TIMEOUT_MS": "2000",
+  "USE_SESSION_CODE": "true",
+  "KEEP_BROWSER_OPEN": "true",
+  "CHALLENGE_URL": "https://serene-frangipane-7fd25b.netlify.app"
+}

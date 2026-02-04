@@ -1,11 +1,12 @@
 {
   "name": "browser-challenge-solver",
   "version": "1.0.0",
-  "description": "Fast brute-force agent to solve 30 browser navigation challenges",
+  "description": "Hybrid agent (heuristics + optional LLM) to solve browser navigation challenges",
   "main": "agent.js",
   "scripts": {
     "start": "node agent-bruteforce.js",
     "bruteforce": "node agent-bruteforce.js",
+    "hybrid": "node agent-bruteforce.js",
     "heuristic": "node agent.js",
     "llm": "node agent-llm.js",
     "hybrid": "node agent-hybrid.js",

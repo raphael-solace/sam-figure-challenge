@@ -1,8 +1,13 @@
 const fs = require('fs');
 
-// Load both result files
-const heuristicResults = JSON.parse(fs.readFileSync('results.json', 'utf8'));
-const llmResults = JSON.parse(fs.readFileSync('results-llm.json', 'utf8'));
+// Load both result files (new paths with fallback)
+const readJson = (primary, fallback) => {
+  const path = fs.existsSync(primary) ? primary : fallback;
+  return JSON.parse(fs.readFileSync(path, 'utf8'));
+};
+
+const heuristicResults = readJson('results/results-hybrid.json', 'results.json');
+const llmResults = readJson('results/results-llm.json', 'results-llm.json');
 
 console.log('\n╔════════════════════════════════════════════════════════════════╗');
 console.log('║         BROWSER AUTOMATION AGENT COMPARISON                    ║');
@@ -92,5 +97,7 @@ const comparison = {
   }
 };
 
-fs.writeFileSync('comparison.json', JSON.stringify(comparison, null, 2));
-console.log('📄 Detailed comparison saved to comparison.json\n');
+if (!fs.existsSync('results')) fs.mkdirSync('results', { recursive: true });
+const comparisonPath = 'results/comparison.json';
+fs.writeFileSync(comparisonPath, JSON.stringify(comparison, null, 2));
+console.log(`📄 Detailed comparison saved to ${comparisonPath}\n`);

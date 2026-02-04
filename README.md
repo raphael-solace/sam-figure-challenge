@@ -1,12 +1,12 @@
 # Browser Challenge Solver 🤖
 
-Fast, intelligent browser automation agent that solves 30 navigation challenges in under 1 minute.
+Fast hybrid browser automation agent (heuristics + optional LLM) that solves 30+ navigation challenges quickly and reliably.
 
 ## 🎯 Challenge
 
 Solve all 30 challenges on [this website](https://serene-frangipane-7fd25b.netlify.app) in under 5 minutes.
 
-**Our Result**: ✅ 30/30 challenges in ~40-50 seconds
+**Our Result**: ✅ 30/30 challenges in ~40-50 seconds (hybrid mode)
 
 ## 🚀 Quick Start
 
@@ -20,17 +20,17 @@ npm start
 
 ## 📊 Performance
 
-- **Time**: 40-50 seconds for 30 challenges
+- **Time**: 40-60 seconds for 30 challenges
 - **Success Rate**: 100%
-- **Brute Force**: 80-90% of challenges (no LLM)
-- **LLM Fallback**: 10-20% of challenges
-- **Cost**: < $0.005 (half a cent)
+- **Heuristics**: 80-95% of challenges (no LLM)
+- **LLM Fallback**: 5-20% of challenges (optional)
+- **Cost**: < $0.01 (with Groq)
 
 ## 🏗️ Architecture
 
 ### Two-Phase Approach
 
-**Phase 1: Brute Force (Primary - No LLM)**
+**Phase 1: Heuristics (Primary - No LLM)**
 1. Dismiss all popups aggressively
 2. Scroll main page + modals
 3. Click radio buttons & checkboxes
@@ -47,7 +47,7 @@ npm start
 ## 📁 Project Structure
 
 ```
-├── agent-bruteforce.js    # ⭐ Main agent (brute force + LLM fallback)
+├── agent-bruteforce.js    # ⭐ Main hybrid agent (heuristics + LLM fallback)
 ├── agent-llm.js            # LLM-only approach (for comparison)
 ├── agent-*.js              # Other experimental agents
 ├── compare.js              # Results comparison script
@@ -57,13 +57,14 @@ npm start
 │   ├── RESEARCH.md         # Automation techniques research
 │   ├── README-LLM.md       # LLM experiment analysis
 │   └── README-FINAL.md     # Detailed solution docs
-└── results-*.json          # Performance metrics
+├── results/               # Performance metrics (ignored by git)
+└── logs/                  # Runtime logs (ignored by git)
 ```
 
 ## 🎮 Available Commands
 
 ```bash
-npm start              # Run brute-force agent (recommended)
+npm start              # Run hybrid agent (recommended)
 npm run bruteforce     # Same as start
 npm run llm            # Run LLM-only agent
 npm run compare        # Compare different agents
@@ -81,20 +82,38 @@ LLM_SERVICE_GENERAL_MODEL_NAME="groq/llama-3.1-8b-instant"
 
 Get a free Groq API key at [console.groq.com](https://console.groq.com)
 
+Optional runtime tuning:
+```env
+LLM_MAX_CALLS=30
+LLM_MAX_CALLS_PER_STEP=1
+LLM_MIN_CALLS_PER_RUN=1
+LLM_MIN_CALLS_PER_STEP=1
+LLM_ALWAYS_ON=true
+LLM_USE_CACHE=false
+LLM_TIMEOUT_MS=2000
+USE_SESSION_CODE=true
+KEEP_BROWSER_OPEN=true
+CHALLENGE_URL="https://serene-frangipane-7fd25b.netlify.app"
+```
+
 ## 💡 Key Features
 
-### Brute Force Strategy
+### Heuristic Strategy
 - ✅ **Aggressive popup dismissal** - Clicks all dismiss/close/accept buttons
 - ✅ **Modal scrolling** - Scrolls within dialogs to reveal hidden content
 - ✅ **Element interaction** - Handles radios, checkboxes, inputs
 - ✅ **Code extraction** - Finds 6-char codes via regex: `/\b[A-Z0-9]{6}\b/g`
 - ✅ **Smart navigation** - Clicks submit → navigation in correct order
 
-### LLM Fallback
+### LLM Fallback (Optional)
 - ✅ **Minimal usage** - Only when brute force fails
 - ✅ **Fast inference** - Groq's Llama 3.1 8B (~0.3-0.5s per call)
 - ✅ **Cheap** - < $0.005 total cost
 - ✅ **Reliable** - Forced JSON response format
+
+### Always-On LLM (Configurable)
+Enable `LLM_ALWAYS_ON=true` and `LLM_MIN_CALLS_PER_RUN=1` to guarantee Groq usage and provide step-by-step navigation assistance.
+Use `LLM_MIN_CALLS_PER_STEP=1` to ensure at least one LLM call per challenge.
 
 ### Detailed Logging
 ```
@@ -111,6 +130,8 @@ Get a free Groq API key at [console.groq.com](https://console.groq.com)
 ```
 
 ## 📈 Results
+
+Results are written to `results/results-hybrid.json` by default.
 
 ### Brute-Force Agent
 ```json

@@ -9,6 +9,9 @@ package-lock.json
 
 # Results and logs
 results*.json
+results/
+logs/
+artifacts/
 *.log
 *.log.*
 
