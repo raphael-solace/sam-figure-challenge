@@ -60,6 +60,43 @@ class BruteForceAgent {
   constructor() {
     this.metrics = new BruteForceMetrics();
     this.currentStep = 0;
+    this.memory = this.loadMemory();
+  }
+  
+  loadMemory() {
+    try {
+      const data = fs.readFileSync('challenge-memory.json', 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      console.log('⚠️  No memory file found, using defaults');
+      return { challengePatterns: {} };
+    }
+  }
+  
+  saveMemory() {
+    this.memory.lastUpdated = new Date().toISOString();
+    fs.writeFileSync('challenge-memory.json', JSON.stringify(this.memory, null, 2));
+  }
+  
+  detectChallengeType(pageText) {
+    const text = pageText.toLowerCase();
+    const detected = [];
+    
+    for (const [type, pattern] of Object.entries(this.memory.challengePatterns)) {
+      const matches = pattern.indicators.some(indicator => text.includes(indicator));
+      if (matches) {
+        detected.push(type);
+      }
+    }
+    
+    return detected;
+  }
+  
+  recordSuccess(challengeType) {
+    if (this.memory.challengePatterns[challengeType]) {
+      this.memory.challengePatterns[challengeType].successCount++;
+      this.saveMemory();
+    }
   }
 
   async delay(ms) {
@@ -75,6 +112,9 @@ class BruteForceAgent {
     });
     this.page = await this.browser.newPage();
     this.page.setDefaultTimeout(10000);
+    
+    // NO FILTERING - Let everything show, we'll handle it programmatically
+    console.log('   ✓ Browser ready (no filtering)');
   }
 
   async getCurrentStep() {
@@ -134,13 +174,82 @@ class BruteForceAgent {
   }
 
   async bruteForceChallenge() {
-    // ENHANCED BRUTE FORCE STRATEGY:
-    // 1. Dismiss all popups
-    // 2. Scroll main page AND modals
-    // 3. Click radio buttons, checkboxes
-    // 4. Extract and type codes
-    // 5. Click SUBMIT
-    // 6. Click navigation
+    // DETECT CHALLENGE TYPE FROM MEMORY
+    const pageText = await this.page.evaluate(() => document.body.innerText);
+    const detectedTypes = this.detectChallengeType(pageText);
+    
+    if (detectedTypes.length > 0) {
+      console.log(`   🧠 Detected challenge types: ${detectedTypes.join(', ')}`);
+      
+      // Handle "wait_seconds" challenge
+      if (detectedTypes.includes('wait_seconds')) {
+        console.log(`   ⏳ Wait challenge detected`);
+        const waitMatch = pageText.match(/wait\s+(?:for\s+)?(\d+)\s+seconds?/i);
+        if (waitMatch) {
+          const seconds = parseInt(waitMatch[1]);
+          console.log(`   ⏳ Waiting for ${seconds} seconds...`);
+          await this.delay(seconds * 1000);
+          console.log(`   ✓ Waited ${seconds} seconds`);
+          this.recordSuccess('wait_seconds');
+          
+          // Click next after waiting
+          const buttons = await this.page.$$('button, a');
+          for (const button of buttons) {
+            try {
+              const text = await button.evaluate(el => el.textContent.toLowerCase());
+              if (text.includes('next') || text.includes('continue')) {
+                await button.click();
+                return { popups: 0, codes: 0, clicked: 1, challengeType: 'wait_seconds' };
+              }
+            } catch (e) {}
+          }
+        }
+      }
+      
+      // Handle "scroll_pixels" challenge
+      if (detectedTypes.includes('scroll_pixels')) {
+        console.log(`   📜 Scroll challenge detected`);
+        const scrollMatch = pageText.match(/scroll\s+(?:down\s+)?(\d+)\s*(?:pixels?|px)/i);
+        if (scrollMatch) {
+          const pixels = parseInt(scrollMatch[1]);
+          console.log(`   📜 Scrolling ${pixels} pixels...`);
+          await this.page.evaluate((px) => window.scrollBy(0, px), pixels);
+          await this.delay(500);
+          console.log(`   ✓ Scrolled ${pixels} pixels`);
+          this.recordSuccess('scroll_pixels');
+          
+          // Click next after scrolling
+          const buttons = await this.page.$$('button, a');
+          for (const button of buttons) {
+            try {
+              const text = await button.evaluate(el => el.textContent.toLowerCase());
+              if (text.includes('next') || text.includes('continue')) {
+                await button.click();
+                return { popups: 0, codes: 0, clicked: 1, challengeType: 'scroll_pixels' };
+              }
+            } catch (e) {}
+          }
+        }
+      }
+      
+      // Handle "audio_listen" challenge - just skip it!
+      if (detectedTypes.includes('audio_listen')) {
+        console.log(`   ⏭️  Audio challenge detected - skipping (no need to listen)`);
+        // Just click next/continue
+        const buttons = await this.page.$$('button, a');
+        for (const button of buttons) {
+          try {
+            const text = await button.evaluate(el => el.textContent.toLowerCase());
+            if (text.includes('next') || text.includes('continue') || text.includes('skip')) {
+              await button.click();
+              console.log(`   ✓ Clicked: Skip audio`);
+              this.recordSuccess('audio_listen');
+              return { popups: 0, codes: 0, clicked: 1, challengeType: 'audio_listen' };
+            }
+          } catch (e) {}
+        }
+      }
+    }
     
     console.log('   📋 Page state:');
     const pageInfo = await this.page.evaluate(() => {
@@ -159,34 +268,234 @@ class BruteForceAgent {
     
     const popups = await this.dismissAllPopups();
     
+    // HOVER OVER ELEMENTS TO REVEAL HIDDEN CONTENT
+    const hoverElements = await this.page.$$('button, div, span, [data-hover], [class*="hover"]');
+    for (const element of hoverElements.slice(0, 10)) {
+      try {
+        const isVisible = await element.isVisible();
+        if (isVisible) {
+          await element.hover();
+          await this.delay(100);
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // CLICK "REVEAL CODE" BUTTONS!
+    const revealButtons = await this.page.$$('button');
+    for (const button of revealButtons) {
+      try {
+        const isVisible = await button.isVisible();
+        if (!isVisible) continue;
+        
+        const text = await button.evaluate(el => el.textContent.toLowerCase());
+        
+        if (text.includes('reveal') || text.includes('show code') || text.includes('get code')) {
+          await button.click();
+          console.log(`   ✓ Clicked: "Reveal Code" button`);
+          await this.delay(300);
+        }
+   s  } catch (e) {
+        // Continue
+      }
+    }
+    
     // Scroll main page
     await this.page.evaluate(() => window.scrollBy(0, 500));
     await this.delay(200);
     
-    // Scroll within modals/dialogs
-    await this.page.evaluate(() => {
+    // PRECISE MODAL SCROLLING - FOCUS ON "Please Select an Option"
+    console.log('   🔍 Looking for scrollable modals...');
+    const scrollResult = await this.page.evaluate(() => {
+      const results = [];
+      
+      // First, find modals specifically
       const modals = document.querySelectorAll('[role="dialog"], .modal, [class*="modal"]');
-      modals.forEach(modal => {
-        if (modal.scrollHeight > modal.clientHeight) {
-          modal.scrollTop += 300;
-        }
+      console.log(`   Found ${modals.length} modal(s)`);
+          modals.forEach((modal, modalIdx) => {
+        // Find scrollable children inside the modal
+        const allChildren = modal.querySelectorAll('*');
+        
+        allChildren.forEach((el, elIdx) => {
+          const hasVerticalScrollbar = el.scrollHeight > el.clientHeight;
+          
+          if (hasVerticalScrollbar) {
+            const computedStyle = window.getComputedStyle(el);
+            const overflowY = computedStyle.overflowY;
+            const overflow = computedStyle.overflow;
+            const canScroll = overflowY === 'scroll' || overflowY === 'auto' || 
+                             overflow === 'scroll' || overflow === 'auto';
+            
+            if (canScroll) {
+              const beforeScroll = el.scrollTop;
+              
+              // Scroll in SMALL increments: 20%, 40%, 60%
+              const positions = [
+                Math.floor(el.scrollHeight * 0.20),
+                Math.floor(el.scrollHeight * 0.40),
+                Math.floor(el.scrollHeight * 0.60)
+              ];
+              
+              let scrolledTo = [];
+              for (const pos of positions) {
+                el.scrollTop = pos;
+                scrolledTo.push(el.scrollTop);
+                
+                // Small delay
+                const start = Date.now();
+                while (Date.now() - start < 150) {}
+              }
+              
+              results.push({
+                modalIdx,
+                elIdx,
+                tag: el.tagName,
+                classes: el.className.slice(0, 50),
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+                scrolledTo: scrolledTo,
+                beforeScroll
+              });
+            }
+          }
+        });
       });
+      
+      return results;
     });
-    await this.delay(200);
     
-    // Click radio buttons (select first visible one)
-    const radios = await this.page.$$('input[type="radio"]');
+    console.log(`   📜 Scrolled ${scrollResult.length} element(s) in modals:`);
+    scrollResult.forEach((r, i) => {
+      console.log(`      ${i+1}. Modal ${r.modalIdx}, Element ${r.elIdx}: ${r.tag}.${r.classes}`);
+      console.log(`         Height: ${r.scrollHeight}px, Visible: ${r.clientHeight}px`);
+      console.log(`         Scrolled from ${r.beforeScroll}px to: ${r.scrolledTo.join('px, ')}px`);
+    });
+    
+    await this.delay(500);
+    
+    // ALSO try mouse wheel on any visible modal
+    try {
+      const modalElements = await this.page.$$('[role="dialog"], .modal, [class*="modal"]');
+      for (const modal of modalElements) {
+        const box = await modal.boundingBox();
+        if (box) {
+          // Move mouse to center of modal
+          await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          // Scroll with mouse wheel
+          for (let i = 0; i < 10; i++) {
+            await this.page.mouse.wheel({ deltaY: 100 });
+            await this.delay(50);
+          }
+        }
+      }
+    } catch (e) {
+      // Continue
+    }
+    
+    // ALSO try keyboard scrolling
+    try {
+      await this.page.keyboard.press('PageDown');
+      await this.delay(100);
+      await this.page.keyboard.press('PageDown');
+      await this.delay(100);
+      await this.page.keyboard.press('End');
+      await this.delay(200);
+    } catch (e) {
+      // Continue
+    }
+    
+    if (scrollResult.length > 0) {
+      console.log(`   ✓ Scrolled ${scrollResult.length} element(s) using multiple methods`);
+      scrollResult.slice(0, 2).forEach(r => {
+        console.log(`      - ${r.tag}.${r.classes.slice(0, 30)} → ${r.scrolled}px`);
+      });
+    } else {
+      console.log(`   ⚠️  No scrollable elements found`);
+    }
+    
+    // CLICK EVERYWHERE - LABELS, DIVS, SPANS NEAR RADIOS
+    const clickableElements = await this.page.$$('label, div, span, button, [role="radio"]');
+    let clickedElements = 0;
+    
+    for (const element of clickableElements) {
+      try {
+        const isVisible = await element.isVisible();
+        if (!isVisible) continue;
+        
+        const text = await element.evaluate(el => el.textContent.toLowerCase());
+        
+        // Click if it contains "correct" or "option"
+        if (text.includes('correct') || text.includes('option b')) {
+          await element.evaluate(el => el.scrollIntoView({ behavior: 'auto', block: 'center' }));
+          await this.delay(100);
+          
+          await element.click();
+          clickedElements++;
+          console.log(`   ✓ Clicked element with: "${text.slice(0, 40)}"`);
+          await this.delay(100);
+          
+          if (clickedElements >= 5) break;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // ENHANCED RADIO BUTTON SELECTION FOR "Please Select an Option"
+    const radios = await this.page.$$('input[type="radio"], button[role="radio"]');
+    let selectedRadio = false;
+    
+    // First pass: look for "select me" or "correct" in nearby text
     for (const radio of radios) {
       try {
         const isVisible = await radio.isVisible();
-        if (isVisible) {
+        if (!isVisible) continue;
+        
+        const labelText = await radio.evaluate(el => {
+          const label = el.closest('label') || 
+                       document.querySelector(`label[for="${el.id}"]`) ||
+                       el.parentElement ||
+                       el.nextElementSibling;
+          return label ? label.textContent.toLowerCase() : '';
+        });
+        
+        // Look for "correct choice" (ALWAYS the right answer), or fallback to "select me" or "correct"
+        if (labelText.includes('correct choice') || labelText.includes('select me') || labelText.includes('correct')) {
+          // Scroll the radio into view first
+          await radio.evaluate(el => el.scrollIntoView({ behavior: 'auto', block: 'center' }));
+          await this.delay(200);
+          
           await radio.click();
-          console.log(`   ✓ Selected radio button`);
+          console.log(`   ✓ Selected radio: "${labelText.slice(0, 40)}"`);
+          selectedRadio = true;
           await this.delay(100);
           break;
         }
       } catch (e) {
         // Continue
+      }
+    }
+    
+    // Second pass: if no "correct" found, try clicking ALL visible radios
+    if (!selectedRadio) {
+      let clickedCount = 0;
+      for (const radio of radios) {
+        try {
+          const isVisible = await radio.isVisible();
+          if (isVisible && clickedCount < 5) {
+            // Scroll into view
+            await radio.evaluate(el => el.scrollIntoView({ behavior: 'auto', block: 'center' }));
+            await this.delay(100);
+            
+            await radio.click();
+            clickedCount++;
+            console.log(`   ✓ Clicked radio button ${clickedCount}`);
+            await this.delay(100);
+          }
+        } catch (e) {
+          // Continue
+        }
       }
     }
     
@@ -220,7 +529,13 @@ class BruteForceAgent {
           if (isVisible) {
             await input.click();
             await this.delay(50);
-            await input.evaluate(el => el.value = '');
+            
+            // Try keyboard shortcuts: Ctrl+A to select all, then type
+            await this.page.keyboard.down('Control');
+            await this.page.keyboard.press('a');
+            await this.page.keyboard.up('Control');
+            await this.delay(50);
+            
             await input.type(codes[0], { delay: 50 });
             console.log(`   ✓ Typed code: ${codes[0]}`);
             typedCode = true;
@@ -230,6 +545,48 @@ class BruteForceAgent {
           // Continue
         }
       }
+    }
+    
+    // TRY KEYBOARD SHORTCUTS FOR COPY/PASTE CHALLENGES
+    try {
+      console.log('   ⌨️  Trying keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V)...');
+      
+      // Select all text on page
+      await this.page.keyboard.down('Control');
+      await this.page.keyboard.press('a');
+      await this.page.keyboard.up('Control');
+      await this.delay(100);
+      
+      // Copy
+      await this.page.keyboard.down('Control');
+      await this.page.keyboard.press('c');
+      await this.page.keyboard.up('Control');
+      await this.delay(100);
+      
+      // Try to find input and paste
+      const pasteInputs = await this.page.$$('input[type="text"], textarea, input:not([type])');
+      for (const input of pasteInputs) {
+        try {
+          const isVisible = await input.isVisible();
+          if (isVisible) {
+            await input.click();
+            await this.delay(50);
+            
+            // Paste
+            await this.page.keyboard.down('Control');
+            await this.page.keyboard.press('v');
+            await this.page.keyboard.up('Control');
+            await this.delay(100);
+            
+            console.log(`   ✓ Pasted content into input`);
+            break;
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+    } catch (e) {
+      // Continue
     }
     
     await this.delay(200);
@@ -380,54 +737,122 @@ class BruteForceAgent {
     const start = Date.now();
     const startStep = await this.getCurrentStep();
     
-    console.log(`\n📝 Step ${startStep}...`);
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`📝 STEP ${startStep} OF 30`);
+    console.log(`${'='.repeat(60)}`);
 
-    // Try brute force first
-    console.log('   🔨 Brute forcing...');
-    const bruteResult = await this.bruteForceChallenge();
+    // PURE BRUTE FORCE - Keep trying until it works!
+    let attempts = 0;
+    const maxAttempts = 5;
+    let attemptLogs = [];
     
-    await this.delay(1000);
-    let newStep = await this.getCurrentStep();
-    
-    if (newStep && newStep > startStep) {
-      const duration = (Date.now() - start) / 1000;
-      console.log(`   ✅ Brute force SUCCESS! ${startStep} → ${newStep}`);
-      this.currentStep = newStep;
-      this.metrics.addChallenge(newStep, duration, 'bruteforce', bruteResult);
-      return { success: true };
+    while (attempts < maxAttempts) {
+      attempts++;
+      console.log(`\n🔨 Attempt ${attempts}/${maxAttempts}...`);
+      
+      const bruteResult = await this.bruteForceChallenge();
+      
+      await this.delay(1000);
+      let newStep = await this.getCurrentStep();
+      
+      // Log what happened in this attempt
+      attemptLogs.push({
+        attempt: attempts,
+        popups: bruteResult.popups,
+        codes: bruteResult.codes,
+        clicked: bruteResult.clicked,
+        stepAfter: newStep
+      });
+      
+      if (newStep && newStep > startStep) {
+        const duration = (Date.now() - start) / 1000;
+        console.log(`\n${'✅'.repeat(30)}`);
+        console.log(`✅ SUCCESS! Step ${startStep} → ${newStep}`);
+        console.log(`   Duration: ${duration.toFixed(2)}s`);
+        console.log(`   Attempts needed: ${attempts}`);
+        console.log(`   What worked:`);
+        console.log(`      - Popups dismissed: ${bruteResult.popups}`);
+        console.log(`      - Codes found: ${bruteResult.codes}`);
+        console.log(`      - Buttons clicked: ${bruteResult.clicked}`);
+        console.log(`${'✅'.repeat(30)}\n`);
+        
+        this.currentStep = newStep;
+        this.metrics.addChallenge(newStep, duration, 'bruteforce', { 
+          ...bruteResult, 
+          attempts,
+          attemptLogs 
+        });
+        
+        // Write incremental log after each successful challenge
+        const progressLog = {
+          timestamp: new Date().toISOString(),
+          step: newStep,
+          duration: duration.toFixed(2),
+          attempts,
+          totalCompleted: this.metrics.challenges.length,
+          challenges: this.metrics.challenges
+        };
+        fs.appendFileSync('progress-log.txt', 
+          `\n${'='.repeat(60)}\n` +
+          `Step ${startStep} → ${newStep} completed in ${duration.toFixed(2)}s (${attempts} attempts)\n` +
+          `Total completed: ${this.metrics.challenges.length}/30\n` +
+          `${new Date().toISOString()}\n`
+        );
+        fs.writeFileSync('progress.json', JSON.stringify(progressLog, null, 2));
+        
+        return { success: true };
+      }
+      
+      console.log(`\n⚠️  Attempt ${attempts} FAILED - Still on step ${startStep}`);
+      console.log(`   What we tried:`);
+      console.log(`      - Dismissed ${bruteResult.popups} popups`);
+      console.log(`      - Found ${bruteResult.codes} codes`);
+      console.log(`      - Clicked ${bruteResult.clicked} buttons`);
+      
+      if (attempts < maxAttempts) {
+        console.log(`   → Retrying in 500ms...`);
+        await this.delay(500);
+      }
     }
-    
-    // Brute force failed, try LLM
-    console.log('   ⚠️  Brute force failed, trying LLM...');
-    const llmResult = await this.llmFallback();
-    
-    await this.delay(1000);
-    newStep = await this.getCurrentStep();
     
     const duration = (Date.now() - start) / 1000;
+    console.log(`\n${'❌'.repeat(30)}`);
+    console.log(`❌ BLOCKED ON STEP ${startStep}`);
+    console.log(`   All ${maxAttempts} attempts failed`);
+    console.log(`   Duration: ${duration.toFixed(2)}s`);
+    console.log(`   Attempt summary:`);
+    attemptLogs.forEach((log, i) => {
+      console.log(`      ${i+1}. Popups: ${log.popups}, Codes: ${log.codes}, Clicks: ${log.clicked}`);
+    });
+    console.log(`   🔍 This step needs investigation!`);
+    console.log(`${'❌'.repeat(30)}\n`);
     
-    if (newStep && newStep > startStep) {
-      console.log(`   ✅ LLM SUCCESS! ${startStep} → ${newStep}`);
-      this.currentStep = newStep;
-      this.metrics.addChallenge(newStep, duration, 'llm', llmResult);
-      return { success: true };
-    }
-    
-    console.log(`   ❌ Both failed, still on ${startStep}`);
-    this.metrics.addChallenge(startStep, duration, 'failed', {});
+    this.metrics.addChallenge(startStep, duration, 'failed', { 
+      attempts: maxAttempts,
+      attemptLogs,
+      blocked: true
+    });
     return { success: false };
   }
 
   async run() {
     try {
       await this.init();
+      
+      // Start timer display
+      const startTime = Date.now();
+      const timerInterval = setInterval(() => {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const remaining = (300 - elapsed).toFixed(1); // 5 minutes = 300 seconds
+        process.stdout.write(`\r⏱️  Elapsed: ${elapsed}s | Remaining: ${remaining}s | Completed: ${this.currentStep}/30`);
+      }, 100);
 
       console.log('🌐 Navigating...');
       await this.page.goto('https://serene-frangipane-7fd25b.netlify.app', {
         waitUntil: 'networkidle0'
       });
 
-      console.log('▶️  Starting...\n');
+      console.log('\n▶️  Starting...\n');
 
       // Click START
       await this.page.evaluate(() => {

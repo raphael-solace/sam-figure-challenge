@@ -1,0 +1,108 @@
+you{
+  "version": "1.0",
+  "lastUpdated": null,
+  "challengePatterns": {
+    "modal_radio_selection": {
+      "description": "Modal with 'Please Select an Option' containing radio buttons",
+      "indicators": ["please select an option", "modal", "radio"],
+      "solution": {
+        "scroll": ["20%", "40%", "60%"],
+        "selectPattern": "select me",
+        "alternatePattern": "correct"
+      },
+      "successCount": 0
+    },
+    "code_input": {
+      "description": "Challenge requiring typing a 6-character code",
+      "indicators": ["enter code", "6-character", "code"],
+      "solution": {
+        "extractPattern": "[A-Z0-9]{6}",
+        "inputType": "text",
+        "submitRequired": true
+      },
+      "successCount": 0
+    },
+    "reveal_code": {
+      "description": "Challenge with a 'Reveal Code' button",
+      "indicators": ["reveal", "show code", "get code"],
+      "solution": {
+        "clickButton": "reveal",
+        "thenExtractCode": true
+      },
+      "successCount": 0
+    },
+    "checkbox_selection": {
+      "description": "Challenge requiring checkbox selection",
+      "indicators": ["checkbox", "select all", "check"],
+      "solution": {
+        "selectAll": true
+      },
+      "successCount": 0
+    },
+    "copy_paste": {
+      "description": "Challenge requiring copy/paste operations",
+      "indicators": ["copy", "paste", "ctrl"],
+      "solution": {
+        "keyboard": ["Ctrl+A", "Ctrl+C", "Ctrl+V"]
+      },
+      "successCount": 0
+    },
+    "audio_listen": {
+      "description": "Challenge asking to listen to audio (skip it)",
+      "indicators": ["listen", "audio", "sound", "play"],
+      "solution": {
+        "skip": true,
+        "clickNext": true,
+        "note": "No need to actually listen"
+      },
+      "successCount": 0
+    },
+    "hover_reveal": {
+      "description": "Challenge requiring hover to reveal content",
+      "indicators": ["hover", "mouse over"],
+      "solution": {
+        "hoverElements": true
+      },
+      "successCount": 0
+    },
+    "draw_square": {
+      "description": "Challenge requiring drawing a square on screen",
+      "indicators": ["draw", "square", "canvas", "shape"],
+      "solution": {
+        "action": "draw",
+        "shape": "square",
+        "method": "mouse_drag"
+      },
+      "successCount": 0
+    },
+    "drag_and_drop": {
+      "description": "Challenge requiring drag and drop elements",
+      "indicators": ["drag", "drop", "move", "draggable"],
+      "solution": {
+        "action": "drag",
+        "method": "mouse_drag_drop"
+      },
+      "successCount": 0
+    },
+    "wait_seconds": {
+      "description": "Challenge requiring waiting for X seconds",
+      "indicators": ["wait", "seconds", "wait for"],
+      "solution": {
+        "action": "wait",
+        "extractPattern": "\\d+",
+        "note": "Extract number of seconds and wait"
+      },
+      "successCount": 0
+    },
+    "scroll_pixels": {
+      "description": "Challenge requiring scrolling X pixels",
+      "indicators": ["scroll", "pixels", "px", "scroll down"],
+      "solution": {
+        "action": "scroll",
+        "extractPattern": "\\d+",
+        "note": "Extract number of pixels and scroll"
+      },
+      "successCount": 0
+    }
+  }
+}
